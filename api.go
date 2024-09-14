@@ -50,6 +50,43 @@ func Init(ctx context.Context, db *gorm.DB, options ...AsyncOption) error {
 	return _mgr.Run(ctx)
 }
 
+func InitNotStart(ctx context.Context, db *gorm.DB, options ...AsyncOption) error {
+	if _mgr != nil {
+		return ErrMgrAlreadyInit
+	}
+	var err error
+
+	cfg := config.Config{
+		Log:               tools.DefaultLog(),
+		RunMaxConcurrency: 5,
+		RunTaskInterval:   1,
+	}
+	for _, opt := range options {
+		if cfg, err = opt.apply(cfg); err != nil {
+			return err
+		}
+	}
+	// pendingRun, pendingDel
+	if cfg.PendingRun == nil {
+		cfg.PendingRun = pending.NewPendingRunDefault(db, cfg.Log)
+	}
+	if cfg.PendingDel == nil {
+		cfg.PendingDel = pending.NewPendingDelDefault(db, cfg.Log)
+	}
+
+	if _mgr, err = async.NewMgr(db, cfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Start(ctx context.Context) error {
+	if _mgr == nil {
+		return ErrMgrNotInit
+	}
+	return _mgr.Run(ctx)
+}
+
 func Stop() {
 	if _mgr == nil {
 		return
